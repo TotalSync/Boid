@@ -9,6 +9,18 @@
         </style>
     </head>
     <body>
+        <div id="controls">
+            |
+            <input type="range" min="0" max="10" value=".1" step = ".001" class="slider" id="coh"> x 
+            <input type="number" id="coh_mult" value = "0" required="true">
+            &ensp; | &ensp;
+            <input type="range" min="0" max="10" value=".1" step = ".001" class="slider" id="rep"> x 
+            <input type="number" id="rep_mult" value = "0" required="true">
+            &ensp; | &ensp;
+            <input type="range" min="0" max="10" value=".1" step = ".001" class="slider" id="adh"> x 
+            <input type="number" id="adh_mult" value = "0" required="true">
+            |
+        </div>
         <canvas id="world" width="800" height="800">
         </canvas>
     </body>
