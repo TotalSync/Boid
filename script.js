@@ -330,12 +330,15 @@ function draw(cfg, ctx)
 function loadInitialSettings()
 {
    document.getElementById("coh").value = COHESION;
+   document.getElementById("cohout").value = COHESION;
    document.getElementById("coh_mult").value = COH_MULTIPLIER;
 
    document.getElementById("rep").value = REPULSION;
+   document.getElementById("repout").value = REPULSION;
    document.getElementById("rep_mult").value = REP_MULTIPLIER;
 
    document.getElementById("adh").value = ADHESION;
+   document.getElementById("adhout").value = ADHESION;
    document.getElementById("adh_mult").value = ADH_MULTIPLIER;
 }
 
