@@ -25,19 +25,20 @@ class Config
 {
    constructor()
    {
-      this.canvas = null;
-      this.paused = false;
-      this.win_height = 300;
-      this.win_width = 400;
-      this.debug = false;
-      this.boids = new Array(BOID_NUM);
-      this.pos_array = new Array(BOID_NUM);
-      this.vel_array = new Array(BOID_NUM);
-      this.groups = new Array(BOID_NUM/50);
+      this.canvas = null;                    //Canvas
+      this.paused = false;                   //Paused variable (Not functional)
+      this.win_height = 300;                 //Window height
+      this.win_width = 400;                  //Window width
+      this.debug = false;                    //Global Debug flag
+      this.boids = new Array(BOID_NUM);      //Boid Objects
+      this.pos_array = new Array(BOID_NUM);  //Position Components
+      this.vel_array = new Array(BOID_NUM);  //Velocity Components
+      this.groups = new Array(BOID_NUM/2);   //Offical Groups
+      this.dirty_groups = new Array (5);     //Dirty Group storage for later parsing
 
-      this.coh = COH_MULTIPLIER * COHESION;
-      this.rep = REP_MULTIPLIER * REPULSION;
-      this.adh = ADH_MULTIPLIER * ADHESION;
+      this.coh = COH_MULTIPLIER * COHESION;  //Global Cohesion Value
+      this.rep = REP_MULTIPLIER * REPULSION; //Global Repulsion Value
+      this.adh = ADH_MULTIPLIER * ADHESION;  //Global Adhesion Value
    }
 }
 
@@ -70,7 +71,6 @@ class Vel
       this.y = y;
    }
 }
-
 class Group
 {
    constructor(id = 0)
@@ -97,8 +97,8 @@ function main(cfg)
    console.log(cfg.canvas);
    if (cfg.canvas.getContext)
    {
-      var ctx = cfg.canvas.getContext('2d');
       generateBoids(cfg);
+      generateGroups(cfg);
       updateWorld();
       //cfg.canvas.addEventListener("mousedown", function(e){ UpdateWorld(cfg, ctx); });
 
@@ -109,7 +109,7 @@ function main(cfg)
       //Canvas Broke Code
    }
 }
-
+//The main "game loop" of the program
 function updateWorld()
 {
    let ctx = cfg.canvas.getContext('2d');
@@ -121,7 +121,7 @@ function updateWorld()
    window.requestAnimationFrame(updateWorld);
 }
 
-
+//The system controlling boids
 function boidSystem(cfg)
 {
    for (let i = 0; i < BOID_NUM; i++)
@@ -131,6 +131,7 @@ function boidSystem(cfg)
    //handleColor(cfg);
 }
 
+//Subsystem that handles the boid movement rules
 function handleMovement(boid, cfg)
 {
    let margin = 40;
@@ -225,7 +226,7 @@ function handleMovement(boid, cfg)
    boid.group_dirty = true; // Set dirty bool to allow for group coloring
 
 }
-
+//Subsystem that will color the boids based on the groups they are in
 function handleColor(cfg)
 {
    for (let i = 0; i < BOID_NUM; i++)
@@ -291,6 +292,20 @@ function generateBoids(cfg)
    }
 }
 
+function generateGroups(cfg)
+{
+   let wander = new Group(0);
+   wander.color = "#000000";
+   cfg.groups[0] = wander;
+   for(let i = 1; i < cfg.groups.length; i++)
+   {
+      let group = new Group(i);
+      if (i < 10) { group.color = "#" + i + i + i + i + i + i; } 
+      else{ group.color = "#" + i + i + i;}
+      cfg.groups[i] = group;
+   }
+}
+
 function resizeCanvas()
 {
    cfg.canvas = document.getElementById("world");
@@ -303,7 +318,13 @@ function resizeCanvas()
 function draw(cfg, ctx)
 {
    ctx.clearRect(0, 0, cfg.win_width, cfg.win_height);
-   cfg.pos_array.forEach(element => drawCircle(element.x, element.y, BOID_RAD, ctx));
+   cfg.boids.forEach(boid => 
+   {
+      let boid_pos = cfg.pos_array[boid.pos];
+      let group = cfg.groups[boid.group];
+
+      drawCircle(boid_pos.x, boid_pos.y, BOID_RAD, ctx, group.color);
+   });
 }
 
 function loadInitialSettings()
