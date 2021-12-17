@@ -375,8 +375,12 @@ function dist(pos2, pos1)
    return Math.sqrt((pos2.x - pos1.x) ** 2) + Math.sqrt((pos2.y - pos1.y) ** 2);
 }
 
-
-function generate_tooltip(x, y, text, size, ctx, color = "#000000", width = 0, height = 0, bounding = 2)
+// x,y = position of the center of the text
+// text = text to be printed
+// size = size of the text in CSS px
+// color = color of the text and bounding box
+// padding =  width of the text padding
+function generate_tooltip(x, y, text, size, ctx, color = "#000000", padding = 2)
 {
    ctx.font = "" + size + "px mono";
    ctx.fillStyle = color;
@@ -384,7 +388,7 @@ function generate_tooltip(x, y, text, size, ctx, color = "#000000", width = 0, h
    ctx.direction = "ltr"
    ctx.textAlign = "center";
    let text_eval = ctx.measureText(text);
-   ctx.strokeRect(x - (text_eval.width/2) - bounding, y - size - bounding, text_eval.width + (bounding * 2), size + (bounding * 2));
+   ctx.strokeRect(x - (text_eval.width/2) - padding, y - size - padding, text_eval.width + (padding * 2), size + (padding * 2));
    ctx.fillText(text, x, y); 
 }
 

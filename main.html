@@ -3,6 +3,7 @@
     <head>
         <meta charset="utf-8"/>
         <title> Emergent Behavior </title>
+        <link rel="stylesheet" href="style.css">
         <script type="text/javascript" src="script.js"></script>
         <style type="text/css">
             canvas {border: 1px solid black;}
@@ -10,16 +11,28 @@
     </head>
     <body>
         <div id="controls">
-            |
-            <input type="range" min="0" max="10" value=".1" step = ".001" class="slider" id="coh"> x 
-            <input type="number" id="coh_mult" value = "0" required="true">
+            |&ensp;
+            <label for="coh">Cohesion:</label>
+            <form oninput="cohout.value=parseFloat(coh.value);" class="tooltip">
+                <input type="range" id="coh" name="coh" min="0" max="10" value=".1" step = ".001" class="slider">
+                <output name="cohout" class="tooltiptext"></output>
+            </form>x
+            <input type="number" id="coh_mult" name="coh_mult" value = "0" step = ".001"required="true">
             &ensp; | &ensp;
-            <input type="range" min="0" max="10" value=".1" step = ".001" class="slider" id="rep"> x 
-            <input type="number" id="rep_mult" value = "0" required="true">
+            <label for="rep">Repulsion:</label>
+            <form oninput="repout.value=parseFloat(rep.value);" class="tooltip">
+                <input type="range" id="rep" name ="rep" min="0" max="10" value=".1" step = ".001" class="slider" >
+                <output name="repout" class="tooltiptext"></output>
+            </form>x 
+            <input type="number" id="rep_mult" value = "0" step=".001" required="true">
             &ensp; | &ensp;
-            <input type="range" min="0" max="10" value=".1" step = ".001" class="slider" id="adh"> x 
-            <input type="number" id="adh_mult" value = "0" required="true">
-            |
+            <label for="adh">Adhesion:</label>
+            <form oninput="adhout.value=parseFloat(adh.value);" class="tooltip">
+                <input type="range" id="adh" name="adh" min="0" max="10" value=".1" step = ".001" class="slider">
+                <output name="adhout" class="tooltiptext"></output>
+            </form>x
+            <input type="number" id="adh_mult" value = "0" step=".001" required="true">
+            &ensp;|
         </div>
         <canvas id="world" width="800" height="800">
         </canvas>
