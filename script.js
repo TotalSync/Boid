@@ -33,12 +33,14 @@ class Config
       this.boids = new Array(BOID_NUM);      //Boid Objects
       this.pos_array = new Array(BOID_NUM);  //Position Components
       this.vel_array = new Array(BOID_NUM);  //Velocity Components
-      this.groups = new Array(BOID_NUM/2);   //Offical Groups
-      this.dirty_groups = new Array (5);     //Dirty Group storage for later parsing
+      this.groups = new Array(BOID_NUM / 2);   //Offical Groups
+      this.dirty_groups = [];                //Dirty Group storage for later parsing
+      this.used_colors = ['rgb(0, 0, 0)'];   //Contains colors used for groups
 
       this.coh = COH_MULTIPLIER * COHESION;  //Global Cohesion Value
       this.rep = REP_MULTIPLIER * REPULSION; //Global Repulsion Value
       this.adh = ADH_MULTIPLIER * ADHESION;  //Global Adhesion Value
+      this.fov = FOV;
    }
 }
 
@@ -52,7 +54,7 @@ class Boid
       this.vel = vel;
       this.fov = FOV;
       this.group = 0;
-      this.group_dirty = false;
+      this.group_dirty = false; //May not be needed?
    }
 }
 class Pos
@@ -71,13 +73,18 @@ class Vel
       this.y = y;
    }
 }
+
+// Reserved Group ID's: 0
+// 0: Wanderer group.
+//       - for single boids.
+//       - Group size is irrelevant
+//       - Must be Colorless 
 class Group
 {
    constructor(id = 0)
    {
       this.id = id;
       this.members = [];
-      this.size = 0;
       this.color = "#000000";
    }
 }
@@ -116,7 +123,7 @@ function updateWorld()
    updateVariables(cfg);
    boidSystem(cfg);
    draw(cfg, ctx);
-   generate_tooltip(cfg.win_width/2, 20, "Boids", 12, ctx);
+   generate_tooltip(cfg.win_width / 2, 20, "Boids", 12, ctx);
 
    window.requestAnimationFrame(updateWorld);
 }
@@ -128,6 +135,7 @@ function boidSystem(cfg)
    {
       handleMovement(cfg.boids[i], cfg);
    }
+   inefficientGrouping(cfg);
    //handleColor(cfg);
 }
 
@@ -167,8 +175,8 @@ function handleMovement(boid, cfg)
       coh_contributors += (!same && coh_dist_bool);
 
       //Repulsion (Collision)
-      repulsion_vel.x -= (other_pos.x - pos.x)  * (!same && rep_dist_bool);
-      repulsion_vel.y -= (other_pos.y - pos.y)  * (!same && rep_dist_bool);
+      repulsion_vel.x -= (other_pos.x - pos.x) * (!same && rep_dist_bool);
+      repulsion_vel.y -= (other_pos.y - pos.y) * (!same && rep_dist_bool);
 
       //Adhesion
       adh_vel.x += (cfg.vel_array[j].x * (dist / boid.fov) * (!same && adh_dist_bool));
@@ -238,15 +246,15 @@ function handleColor(cfg)
          let boid_group = [];
          boid_group.append(i);
          boid.group_dirty = false;
-          
-         for (let j = i+1; j < BOID_NUM; j++) 
+
+         for (let j = i + 1; j < BOID_NUM; j++) 
          {
             let same = (i == j);
             let other = cfg.pos_array[j];
             let dist = dits(other, pos);
             let in_view = dist < boid.fov;
-            
-            if(in_view)
+
+            if (in_view)
             {
                boid_group.append(j);
             }
@@ -255,19 +263,19 @@ function handleColor(cfg)
          let finished = false;
          while (!finished)
          {
-            for(let j = 1; j < boid_group.length; j++)
+            for (let j = 1; j < boid_group.length; j++)
             {
                let iter_boid = cfg.pos_array[boid_group[j]];
-               for(let k = 1; k < BOID_NUM; k++)
+               for (let k = 1; k < BOID_NUM; k++)
                {
                   let other = cfg.pos_array[k];
                }
                let same = (k == iter_boid.pos);
                let dist = dist(other, pos);
-               let in_view = dist < boid.fov
-               if(in_view)
+               let in_view = dist < boid.fov;
+               if (in_view)
                {
-                  
+
                }
             }
          }
@@ -279,6 +287,264 @@ function handleColor(cfg)
       }
    }
 
+}
+
+function inefficientGrouping(cfg)
+{
+   let remaining_dirty = [];
+   //Loop collects boids that are not yet cleaned to reduce population checking
+   //Loop starts at outer loop i since boids before will have been cleaned.
+   for (let j = 0; j < BOID_NUM; j++)
+   {
+      remaining_dirty.push(cfg.boids[j]);
+   }
+
+   //Iterates through each boid in the dirty array
+   for (let i = 0; i < remaining_dirty.length; i++)
+   {
+      let new_group = [];                       // Create new_group for each iteration
+      let root_boid = remaining_dirty.pop(i);   // Get designated boid & remove it from the dirty array (cleaning)
+      root_boid.group_dirty = false;            // Clean root group boid
+      new_group.push(root_boid);                // Assign to new_group
+      let root_boid_pos = cfg.pos_array[root_boid.pos];   // Fetch boid Pos Component to reduce repetitious fetching
+
+      // Iterates through the dirty boids a second time to calculate distance and form first group
+      // Appends to group if within fov.
+      {
+         let finished = false;
+         let j = 0;
+         while(!finished)
+         {
+            let other_boid = remaining_dirty[j];
+            if (other_boid != undefined)
+            {
+               let distance = dist(cfg.pos_array[other_boid.pos], root_boid_pos);
+               if (root_boid.fov < distance)
+               {
+                  // Appends other boid to new group if it is within fov
+                  // Mark boid clean.
+                  new_group.push(other_boid);
+                  other_boid.group_dirty = false;
+                  remaining_dirty.pop(j);
+               }
+            }
+            if(remaining_dirty.length > j+1){
+               j++
+            } else {
+               finished = true;
+            }
+         }
+      }
+
+      /* While loop replaces this for loop. Might be causing issues
+      for (let j = 0; j < remaining_dirty.length; j++) 
+      {
+         let other_boid = remaining_dirty[j];
+         if (other_boid != undefined)
+         {
+            let distance = dist(cfg.pos_array[other_boid.pos], root_boid_pos);
+            if (root_boid.fov < distance)
+            {
+               // Appends other boid to new group if it is within fov
+               // Mark boid clean.
+               new_group.push(other_boid);
+               other_boid.group_dirty = false;
+               remaining_dirty.pop(j);
+            }
+         }
+      } */
+
+      // If the group is greater than one, iterate through the children of the root boid
+      // and add the new found boids to the group if they are not cleaned. Boids are cleaned
+      // when appended to the new group.
+      if (new_group.length != 1)
+      {
+         //Iterate through the new_group and append new boids
+         //Theoretically should increase loop len while oping?
+         let finished = false;
+         let j = 1;
+         while (!finished)
+         {
+            let next_boid = new_group[j];
+            let next_pos = cfg.pos_array[next_boid.pos];
+            remaining_dirty.forEach(other_boid =>{
+               let other_pos = cfg.pos_array[other_boid.pos];
+               let distance = dist(other_pos, next_pos);
+               if (distance < cfg.fov)
+               {
+                  new_group.push(other_boid);
+               }
+            })
+            if (new_group.length > (j + 1))
+            {
+               j++;
+            } else
+            {
+               finished = true;
+            }
+         }
+
+         //TODO remove pop undefined edgecase error.
+
+         // Handle Grouping
+         // Fetch the group id from helper function
+         // If the group id is not defined, throw an error
+         // If the group record in the cfg is larger than the found group,
+         //    append the found group to the cfg.dirty_group for later handling.
+         // Else update group memebers with the found group. 
+         let final_group_id = groupVote(new_group);
+         if (final_group_id == undefined) { console.error("Group id returned Undefined. This should not happen."); }
+         else if(final_group_id == 0) {
+            let new_id = new_group.find(element => element != 0);
+            if (new_id == 0 || new_id == undefined)
+            {
+               occupyNewGroup(cfg, new_group);
+            }
+         }
+         else
+         {
+            let final_group = new_group;
+            // Check the boid group against the cfg to determine if group size is less than
+            if (cfg.groups[final_group_id].length > final_group.length)
+            {
+               let new_final_group = new Group(final_group_id);
+               new_final_group.id = final_group_id;
+               new_final_group.members = final_group;
+               cfg.dirty_groups.push(new_final_group);
+            } else
+            {
+               // Update the cfg group with the new members.
+               cfg.groups[final_group_id].members = final_group;
+               // Update each group memebers id to the new group.
+               for (let j = 0; j < final_group.length; j++)
+               {
+                  final_group[j].group = final_group_id;
+               }
+            }
+         }
+
+      } else 
+      {
+         //Assign wanderer
+         root_boid.group.id = 0;
+      }
+   }
+
+   // Iterate through the dirty groups
+   // Pop the boids from the dirty groups to clean
+   //
+   // Edge Cases:
+   //    Initial Groups need to be assigned
+   //       -Initial Grouping Function
+   //    More than 2 groups with same id
+   //       -Collect all groups
+   //    One group with an id
+   //       -Simple Assignement
+
+   let unique_ids = [];
+   //Collects unique IDs
+   for (let i = 0; i < cfg.dirty_groups.length; i++)
+   {
+      let group = cfg.dirty_groups[i];
+      if (unique_ids.find(id => id == group.id) == undefined)
+      {
+         unique_ids.push(group.id);
+      }
+   }
+   //Collect similar groups for operation.
+   for (let i = 0; i < unique_ids.length; i++)
+   {
+      let op_id = unique_ids[i];
+      let op_group = [];
+
+      //Collects similar groups and puts them in op_group;
+      for (let j = 0; j < cfg.dirty_groups.length; j++)
+      {
+         let group = cfg.dirty_groups[j];
+         if (group.id == op_id)
+         {
+            op_group.push(group);
+         }
+      }
+      //handle group assignments based on op_group size
+      switch (op_group.length)
+      {
+         case 0:
+            console.error("Tried to operate dirty group assignment with no dirty groups.");
+         case 1:
+            cfg.groups[op_id].members = op_group[0].members;
+            array.forEach(element => { element.group = op_id; });
+         default:
+            let pop_max = 0;
+            let max_ind = 0;
+            for (let j = 0; j < op_group.length; j++)
+            {
+               let size = op_group[j].members.length;
+               pop_max = Math.max(pop_max, size);
+               if (pop_max == size) { max_ind = j; }
+            }
+            cfg.groups[op_id].members = op_group[max_ind].members;
+            op_group.pop(max_ind);
+            for (let j = 0; j < op_group.length; j++)
+            {
+               occupyNewGroup(cfg, op_group[j]);
+            }
+
+      }
+
+   }
+   cfg.dirty_groups = [];
+}
+
+//Initial Group assignment group
+function initialGrouping(cfg)
+{
+
+}
+
+function groupVote(boids)
+{
+   let group_num = [];
+   let group_vote = [];
+
+   // Append the first boid group number to the list, and increment the same
+   // index of the vote array.
+   group_num.push(cfg.boids[boids[0]]);
+   group_vote.push(1);
+
+   for (let a = 1; a < boids.length; a++)
+   {
+      let boid = cfg.boids[boids[a]];
+      let index = group_num.findIndex(element => element == boid.group);
+      if (index == undefined)
+      {
+         group_num.push(boid.group);
+         group_vote.push(1);
+      } else
+      {
+         group_vote[index]++;
+      }
+   }
+
+   let max = arrayMax(group_vote);
+   let max_index = group_vote.findIndex(element => element == max);
+   if (max_index == undefined) 
+   {
+      return undefined;
+   }
+   return group_vote[max_index];
+}
+
+// This function is supposed to find an unused group and replace its content
+// This idea has proven very difficult, so I have just opted to append a new group
+// This method should not cause an information overflow in the long run since the boids
+// will theoretically stabilize, but it is a problem I can not solve currently. 
+function occupyNewGroup(cfg, members)
+{
+   let new_group = new Group(cfg.groups.length + 1);
+   new_group.members = members;
+   new_group.color = generateColor(cfg);
+   cfg.groups.push(new_group);
 }
 
 
@@ -297,13 +563,34 @@ function generateGroups(cfg)
    let wander = new Group(0);
    wander.color = "#000000";
    cfg.groups[0] = wander;
-   for(let i = 1; i < cfg.groups.length; i++)
+   for (let i = 1; i < cfg.groups.length; i++)
    {
       let group = new Group(i);
-      if (i < 10) { group.color = "#" + i + i + i + i + i + i; } 
-      else{ group.color = "#" + i + i + i;}
+      group.color = generateColor(cfg);
       cfg.groups[i] = group;
    }
+}
+
+function generateColor(cfg)
+{
+   let finished = false;
+   let color_string = 'rgb(';
+   while (!finished)
+   {
+      color_string += Math.floor(randRange(240, 20));
+      color_string += ', ';
+      color_string += Math.floor(randRange(240, 20));
+      color_string += ', ';
+      color_string += Math.floor(randRange(240, 20));
+      color_string += ')';
+
+      if (cfg.used_colors.find(element => element == color_string) == undefined)
+      {
+         cfg.used_colors.push(color_string);
+         finished = true;
+      }
+   }
+   return color_string;
 }
 
 function resizeCanvas()
@@ -322,7 +609,6 @@ function draw(cfg, ctx)
    {
       let boid_pos = cfg.pos_array[boid.pos];
       let group = cfg.groups[boid.group];
-
       drawCircle(boid_pos.x, boid_pos.y, BOID_RAD, ctx, group.color);
    });
 }
@@ -346,7 +632,7 @@ function updateVariables(cfg)
 {
    let coh = document.getElementById("coh").value;
    let coh_mult = document.getElementById("coh_mult").value;
-   cfg.coh = coh * coh_mult; 
+   cfg.coh = coh * coh_mult;
 
    let rep = document.getElementById("rep").value;
    let rep_mult = document.getElementById("rep_mult").value;
@@ -409,12 +695,27 @@ function generate_tooltip(x, y, text, size, ctx, color = "#000000", padding = 2)
    ctx.font = "" + size + "px mono";
    ctx.fillStyle = color;
    ctx.strokeStyle = color;
-   ctx.direction = "ltr"
+   ctx.direction = "ltr";
    ctx.textAlign = "center";
    let text_eval = ctx.measureText(text);
-   ctx.strokeRect(x - (text_eval.width/2) - padding, y - size - padding, text_eval.width + (padding * 2), size + (padding * 2));
-   ctx.fillText(text, x, y); 
+   ctx.strokeRect(x - (text_eval.width / 2) - padding, y - size - padding, text_eval.width + (padding * 2), size + (padding * 2));
+   ctx.fillText(text, x, y);
 }
+
+function arrayMax(array)
+{
+   let len = array.length;
+   let max = -Infinity;
+   while (len--)
+   {
+      if (array[len] > max) 
+      {
+         max = array[len];
+      }
+   }
+   return max;
+}
+
 
 
 window.onload = function ()
