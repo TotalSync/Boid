@@ -33,7 +33,7 @@ class Config
       this.boids = new Array(BOID_NUM);      //Boid Objects
       this.pos_array = new Array(BOID_NUM);  //Position Components
       this.vel_array = new Array(BOID_NUM);  //Velocity Components
-      this.groups = new Array(BOID_NUM / 2);   //Offical Groups
+      this.groups = [];                      //Offical Groups
       this.dirty_groups = [];                //Dirty Group storage for later parsing
       this.used_colors = ['rgb(0, 0, 0)'];   //Contains colors used for groups
 
@@ -143,7 +143,7 @@ function boidSystem(cfg)
 function handleMovement(boid, cfg)
 {
    let margin = 40;
-   let boids = cfg.boids;
+   //let boids = cfg.boids;
    let pos = cfg.pos_array[boid.pos];
    let vel = cfg.vel_array[boid.vel];
 
@@ -256,7 +256,7 @@ function handleColor(cfg)
 
             if (in_view)
             {
-               boid_group.append(j);
+               boid_group.push(j);
             }
 
          }
@@ -291,21 +291,19 @@ function handleColor(cfg)
 
 function inefficientGrouping(cfg)
 {
-   let remaining_dirty = [];
-   //Loop collects boids that are not yet cleaned to reduce population checking
-   //Loop starts at outer loop i since boids before will have been cleaned.
-   for (let j = 0; j < BOID_NUM; j++)
-   {
-      remaining_dirty.push(cfg.boids[j]);
-   }
+   let remaining_dirty = cfg.boids;
+   let previous_groups = cfg.groups;
+   cfg.groups = [new Group()];         //Initialized new group array with Wanderer's group
 
    //Iterates through each boid in the dirty array
    for (let i = 0; i < remaining_dirty.length; i++)
    {
-      let new_group = [];                       // Create new_group for each iteration
-      let root_boid = remaining_dirty.pop(i);   // Get designated boid & remove it from the dirty array (cleaning)
-      root_boid.group_dirty = false;            // Clean root group boid
-      new_group.push(root_boid);                // Assign to new_group
+      let new_group = [];                             // Create new_group for each iteration
+      let root_boid = remaining_dirty[i];             // Get the root boid
+      root_boid.group_dirty = false;                  // Clean root group boid
+      new_group.push(root_boid);                      // Assign to new_group
+      i--;                                            // Decrement i to handle new array length
+      remaining_dirty = remaining_dirty.splice(i,1);              // Remove boid from the dirty array (cleaning)
       let root_boid_pos = cfg.pos_array[root_boid.pos];   // Fetch boid Pos Component to reduce repetitious fetching
 
       // Iterates through the dirty boids a second time to calculate distance and form first group
@@ -318,14 +316,16 @@ function inefficientGrouping(cfg)
             let other_boid = remaining_dirty[j];
             if (other_boid != undefined)
             {
-               let distance = dist(cfg.pos_array[other_boid.pos], root_boid_pos);
+               let other_pos = cfg.pos_array[other_boid.pos];
+               let distance = dist(other_pos, root_boid_pos);
                if (root_boid.fov < distance)
                {
                   // Appends other boid to new group if it is within fov
                   // Mark boid clean.
                   new_group.push(other_boid);
                   other_boid.group_dirty = false;
-                  remaining_dirty.pop(j);
+                  remaining_dirty.splice(j,1);
+                  j--; // Correction for the reduction in length of the array
                }
             }
             if(remaining_dirty.length > j+1){
@@ -335,24 +335,6 @@ function inefficientGrouping(cfg)
             }
          }
       }
-
-      /* While loop replaces this for loop. Might be causing issues
-      for (let j = 0; j < remaining_dirty.length; j++) 
-      {
-         let other_boid = remaining_dirty[j];
-         if (other_boid != undefined)
-         {
-            let distance = dist(cfg.pos_array[other_boid.pos], root_boid_pos);
-            if (root_boid.fov < distance)
-            {
-               // Appends other boid to new group if it is within fov
-               // Mark boid clean.
-               new_group.push(other_boid);
-               other_boid.group_dirty = false;
-               remaining_dirty.pop(j);
-            }
-         }
-      } */
 
       // If the group is greater than one, iterate through the children of the root boid
       // and add the new found boids to the group if they are not cleaned. Boids are cleaned
@@ -373,6 +355,8 @@ function inefficientGrouping(cfg)
                if (distance < cfg.fov)
                {
                   new_group.push(other_boid);
+                  remaining_dirty = remaining_dirty.splice(j,1);
+                  j--;
                }
             })
             if (new_group.length > (j + 1))
@@ -394,7 +378,7 @@ function inefficientGrouping(cfg)
          // Else update group memebers with the found group. 
          let final_group_id = groupVote(new_group);
          if (final_group_id == undefined) { console.error("Group id returned Undefined. This should not happen."); }
-         else if(final_group_id == 0) {
+         else if(final_group_id == 0 || previous_groups[final_group_id] == undefined) {
             let new_id = new_group.find(element => element != 0);
             if (new_id == 0 || new_id == undefined)
             {
@@ -404,22 +388,23 @@ function inefficientGrouping(cfg)
          else
          {
             let final_group = new_group;
+            let new_final_group = new Group(final_group_id);
+            new_final_group.id = final_group_id;
+            new_final_group.members = final_group;
+            new_final_group.color = previous_groups[final_group_id].color;
             // Check the boid group against the cfg to determine if group size is less than
-            if (cfg.groups[final_group_id].length > final_group.length)
+            if (previous_groups[final_group_id].length > final_group.length)
             {
-               let new_final_group = new Group(final_group_id);
-               new_final_group.id = final_group_id;
-               new_final_group.members = final_group;
                cfg.dirty_groups.push(new_final_group);
             } else
             {
                // Update the cfg group with the new members.
-               cfg.groups[final_group_id].members = final_group;
                // Update each group memebers id to the new group.
                for (let j = 0; j < final_group.length; j++)
                {
                   final_group[j].group = final_group_id;
                }
+               cfg.groups[final_group_id] = new_final_group;
             }
          }
 
@@ -451,13 +436,13 @@ function inefficientGrouping(cfg)
          unique_ids.push(group.id);
       }
    }
-   //Collect similar groups for operation.
+   // Collect similar groups for operation.
    for (let i = 0; i < unique_ids.length; i++)
    {
       let op_id = unique_ids[i];
       let op_group = [];
 
-      //Collects similar groups and puts them in op_group;
+      // Collects similar groups and puts them in op_group;
       for (let j = 0; j < cfg.dirty_groups.length; j++)
       {
          let group = cfg.dirty_groups[j];
@@ -469,27 +454,57 @@ function inefficientGrouping(cfg)
       //handle group assignments based on op_group size
       switch (op_group.length)
       {
+         // All Negative cases are negligible as it returns a length
+         // Case 0 is an error case. 
          case 0:
             console.error("Tried to operate dirty group assignment with no dirty groups.");
+         // Case 1 is just a simple override of the group in the log.
          case 1:
             cfg.groups[op_id].members = op_group[0].members;
             array.forEach(element => { element.group = op_id; });
+         // Case 2 is a simple comparison of groups size
+         // The larger group gets a new group, the smaller group gets a new group
+         case 2:
+            {
+               let group1 = op_group[0];
+               let group2 = op_group[1];
+               let new_group = new Group(op_id);
+               new_group.color = previous_groups[op_id].color;
+               if(group1.length > group2.length)
+               {
+                  new_group.members = group1;
+                  occupyNewGroup(cfg, group2);
+               }
+               else
+               {
+                  new_group.members = group2;
+                  occupyNewGroup(cfg, group1);
+               }
+               cfg.groups[op_id] = new_group;
+            }
+         //default is for any case that is larger than 3
+         //The largest group claims the group
+         //The smaller groups are given new groups
          default:
-            let pop_max = 0;
-            let max_ind = 0;
-            for (let j = 0; j < op_group.length; j++)
             {
-               let size = op_group[j].members.length;
-               pop_max = Math.max(pop_max, size);
-               if (pop_max == size) { max_ind = j; }
+               let pop_max = 0;
+               let max_ind = 0;
+               let new_group = new Group(op_id);
+               new_group.color = previous_groups[op_id].color;
+               for (let j = 0; j < op_group.length; j++)
+               {
+                  let size = op_group[j].members.length;
+                  pop_max = Math.max(pop_max, size);
+                  if (pop_max == size) { max_ind = j; }
+               }
+               new_group.members = op_group[max_ind].members
+               cfg.groups[op_id]= new_group;
+               op_group = op_group.splice(max_ind,1);
+               for (let j = 0; j < op_group.length; j++)
+               {
+                  occupyNewGroup(cfg, op_group[j]);
+               }
             }
-            cfg.groups[op_id].members = op_group[max_ind].members;
-            op_group.pop(max_ind);
-            for (let j = 0; j < op_group.length; j++)
-            {
-               occupyNewGroup(cfg, op_group[j]);
-            }
-
       }
 
    }
@@ -499,7 +514,9 @@ function inefficientGrouping(cfg)
 //Initial Group assignment group
 function initialGrouping(cfg)
 {
-
+   cfg.boids.forEach(boid => {
+      boid.group.id = ran
+   });
 }
 
 function groupVote(boids)
@@ -509,12 +526,12 @@ function groupVote(boids)
 
    // Append the first boid group number to the list, and increment the same
    // index of the vote array.
-   group_num.push(cfg.boids[boids[0]]);
+   group_num.push(boids[0].group);
    group_vote.push(1);
 
    for (let a = 1; a < boids.length; a++)
    {
-      let boid = cfg.boids[boids[a]];
+      let boid = boids[a];
       let index = group_num.findIndex(element => element == boid.group);
       if (index == undefined)
       {
@@ -543,8 +560,22 @@ function occupyNewGroup(cfg, members)
 {
    let new_group = new Group(cfg.groups.length + 1);
    new_group.members = members;
+   new_group.membersforEach(member => {
+      member.group = new_group.id; 
+   })
    new_group.color = generateColor(cfg);
+   console.log("New Color" + new_group.color);
    cfg.groups.push(new_group);
+}
+
+function appendGroupQueue(cfg)
+{
+
+}
+
+function newGroupQueue(cfg)
+{
+
 }
 
 
