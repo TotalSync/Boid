@@ -1,0 +1,38 @@
+.tooltip
+{
+    position:relative;
+    display: inline-block;
+}
+
+.tooltip .tooltiptext
+{
+    visibility: hidden;
+    width: 120px;
+    top: 100%;
+    left: 50%;
+    margin-left: -60px; /* Use half of the width (120/2 = 60), to center the tooltip */
+
+    background-color: gray;
+    color: white;
+    text-align: center;
+    pad: 5px 2px;
+    border-radius: 0;
+
+    position: absolute;
+    z-index: 1;
+}
+.tooltip:hover .tooltiptext
+{
+    visibility: visible;
+}
+
+*
+{
+    color: white;
+    background-color: #363636;
+}
+
+canvas
+{
+    background-color: white;
+}
